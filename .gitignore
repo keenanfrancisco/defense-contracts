@@ -4,3 +4,4 @@ data/contracts.db-*
 data/contracts.db.tmp
 __pycache__/
 .venv/
+.DS_Store
