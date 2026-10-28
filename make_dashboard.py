@@ -88,8 +88,18 @@ def compute_takeaways(data):
         base_year, multiples = growth_index(growth_totals, growth_years, group)
         if base_year is not None and base_year < fy:
             pieces.append(f"{label} {multiples[-1]:.1f}x since FY{base_year}")
+    prime_years = [growth_totals[(year, "prime")] for year in growth_years if (year, "prime") in growth_totals]
     if pieces:
-        first += " Growth: " + "; ".join(pieces) + "."
+        first += " Growth: " + pieces[0] + "."
+    if prime_years:
+        first += f" The primes moved between {money(min(prime_years))} and {money(max(prime_years))} a year with no clear trend."
+    by_company = {}
+    for row in data.get("company_totals", []):
+        if row["fy"] == fy and row["grp"] == "new_entrant":
+            by_company[row["company"]] = row["amount"]
+    if entrants and by_company:
+        top = max(by_company, key=by_company.get)
+        first += f" {top} accounts for {by_company[top] / entrants:.0%} of the new entrants' FY{fy} total."
     valid = [row for row in data["latest_shares"] if row["share_fixed"] is not None]
     if valid:
         leader = max(valid, key=lambda row: row["share_fixed"])
@@ -143,6 +153,8 @@ def load_analysis(database):
                               ("share_history", "fixed_share_history.sql"),
                               ("anduril_mix", "anduril_pricing_mix.sql")]:
             data[key] = [dict(row) for row in conn.execute((ROOT / "queries" / filename).read_text(), {"latest_fy": latest})]
+        data["company_totals"] = [dict(row) for row in conn.execute(
+            "SELECT company, grp, fy, SUM(amount) AS amount FROM obligations GROUP BY company, grp, fy")]
         data["row_count"] = conn.execute("SELECT COUNT(*) FROM obligations").fetchone()[0]
         data["query_count"] = conn.execute("SELECT COUNT(*) FROM pull_metadata").fetchone()[0]
         data["pull_start"], data["pull_end"] = conn.execute("SELECT MIN(pulled_at), MAX(pulled_at) FROM pull_metadata").fetchone()
