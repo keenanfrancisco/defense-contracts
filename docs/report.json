@@ -4,7 +4,7 @@
   "pull_start": "2026-10-27T13:04:01.442998+00:00",
   "pull_end": "2026-10-27T13:22:57.591714+00:00",
   "takeaways": [
-    "In FY2026, new entrants receive 1.4% of these cohorts’ combined DoD obligations ($1.98B versus $140.28B for the primes).",
+    "In FY2026, new entrants receive 1.4% of these cohorts’ combined DoD obligations ($1.98B versus $140.28B for the primes). Growth: new entrants 11.7x since FY2020; primes 0.9x since FY2020.",
     "Palantir and Shield AI tie for the highest fixed-price share in FY2026, at 100.0% of their positive pricing-group obligations.",
     "Northrop Grumman’s fixed-price share decreased 44.4 percentage points from FY2020 to FY2026, the largest absolute change among companies with comparable endpoints.",
     "In FY2026, fixed-price accounts for 99.7% of Anduril’s $642.9M in net DoD obligations."
@@ -731,6 +731,11 @@
       "result_rows": 2
     }
   ],
-  "png_exports": [],
-  "png_export_error": "BrowserFailedError: ('The browser seemed to close immediately after starting.', 'You can set the `logging.Logger` level lower to see more output.', 'You may try installing a known working copy of Chrome by running ', '`$ choreo_get_chrome`.It may be your browser auto-updated and will now work upon restart. The browser we tried to start is located at /Applications/Google Chrome.app/Contents/MacOS/Google Chrome.')"
+  "png_exports": [
+    "img/cohort-totals.png",
+    "img/latest-fixed-share.png",
+    "img/fixed-share-history.png",
+    "img/anduril-pricing-mix.png"
+  ],
+  "png_export_error": null
 }

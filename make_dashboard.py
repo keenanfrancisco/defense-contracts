@@ -47,6 +47,32 @@ def money(amount):
     return f"${amount:,.2f}"
 
 
+def growth_index(totals, years, group):
+    """Return (base_year, [amount / base amount per year]) using the first positive year as 1x."""
+    base_year = next((fy for fy in years if totals.get((fy, group), 0) > 0), None)
+    if base_year is None:
+        return None, []
+    base = totals[(base_year, group)]
+    return base_year, [None if fy < base_year else totals.get((fy, group), 0) / base for fy in years]
+
+
+def headline_stats(data):
+    fy = data["latest_fy"]
+    years = sorted({row["fy"] for row in data["cohort_totals"] if row["fy"] <= fy})
+    totals = {(row["fy"], row["grp"]): row["amount"] for row in data["cohort_totals"]}
+    stats = []
+    base_year, multiples = growth_index(totals, years, "new_entrant")
+    if base_year is not None and base_year < fy:
+        stats.append((f"{multiples[-1]:.1f}x", f"Growth in new-entrant DoD obligations, FY{base_year} to FY{fy}"))
+    entrants, primes = totals.get((fy, "new_entrant"), 0), totals.get((fy, "prime"), 0)
+    if entrants + primes:
+        stats.append((f"{entrants / (entrants + primes):.1%}", f"New entrants' share of the two groups' combined FY{fy} obligations"))
+    anduril = next((row for row in data["latest_shares"] if row["company"] == "Anduril" and row["share_fixed"] is not None), None)
+    if anduril:
+        stats.append((f"{anduril['share_fixed']:.1%}", f"Share of Anduril's FY{fy} DoD dollars on fixed-price terms"))
+    return stats
+
+
 def compute_takeaways(data):
     fy = data["latest_fy"]
     totals = {row["grp"]: row["amount"] for row in data["cohort_totals"] if row["fy"] == fy}
@@ -55,6 +81,15 @@ def compute_takeaways(data):
     first = (f"In FY{fy}, new entrants receive {entrants / combined:.1%} of these cohorts’ combined DoD obligations "
              f"({money(entrants)} versus {money(primes)} for the primes)." if combined else
              f"FY{fy} has no net obligations for the configured cohorts, so their relative share is undefined.")
+    growth_years = sorted({row["fy"] for row in data["cohort_totals"] if row["fy"] <= fy})
+    growth_totals = {(row["fy"], row["grp"]): row["amount"] for row in data["cohort_totals"]}
+    pieces = []
+    for group, label in [("new_entrant", "new entrants"), ("prime", "primes")]:
+        base_year, multiples = growth_index(growth_totals, growth_years, group)
+        if base_year is not None and base_year < fy:
+            pieces.append(f"{label} {multiples[-1]:.1f}x since FY{base_year}")
+    if pieces:
+        first += " Growth: " + "; ".join(pieces) + "."
     valid = [row for row in data["latest_shares"] if row["share_fixed"] is not None]
     if valid:
         leader = max(valid, key=lambda row: row["share_fixed"])
@@ -119,10 +154,18 @@ def make_figures(data, companies):
     years = sorted({row["fy"] for row in data["cohort_totals"]})
     totals = {(row["fy"], row["grp"]): row["amount"] for row in data["cohort_totals"]}
     cohort = go.Figure()
-    for group, label in [("new_entrant", "New entrants"), ("prime", "Primes")]:
-        cohort.add_trace(go.Bar(name=label, x=years, y=[totals.get((fy, group), 0) / 1e9 for fy in years],
-                                marker_color=COLORS[group], hovertemplate="FY%{x}: $%{y:,.3f}B<extra>%{fullData.name}</extra>"))
-    cohort.update_layout(barmode="group", yaxis_title="Net obligations ($B)")
+    for group, label in [("prime", "Primes"), ("new_entrant", "New entrants")]:
+        base_year, multiples = growth_index(totals, years, group)
+        if base_year is None:
+            continue
+        cohort.add_trace(go.Scatter(name=label, x=years, y=multiples, mode="lines+markers+text",
+                                    line=dict(color=COLORS[group], width=3), marker=dict(size=9),
+                                    text=[f"{value:.1f}x" if fy == years[-1] and value is not None else "" for fy, value in zip(years, multiples)],
+                                    textposition="middle right", textfont=dict(color="rgb(35,40,43)"), cliponaxis=False,
+                                    customdata=[totals.get((fy, group), 0) / 1e9 for fy in years],
+                                    hovertemplate="FY%{x}: %{y:.1f}x FY" + str(base_year) + " · $%{customdata:,.2f}B<extra>%{fullData.name}</extra>"))
+    cohort.update_layout(yaxis_title=f"Obligations vs. FY{years[0]} (1x = FY{years[0]} level)")
+    cohort.update_yaxes(ticksuffix="x", rangemode="tozero")
     shares = sorted((row for row in data["latest_shares"] if row["share_fixed"] is not None),
                     key=lambda row: row["share_fixed"])
     latest = go.Figure(go.Bar(x=[row["share_fixed"] * 100 for row in shares],
@@ -182,12 +225,12 @@ def data_table(rows, columns):
 
 def render_dashboard(data, figures, takeaways, output_dir):
     output_dir.mkdir(parents=True, exist_ok=True)
-    titles = ["How much do the two cohorts receive?", f"Who uses fixed-price most in FY{data['latest_fy']}?",
-              "How has the pricing mix changed?", "How is Anduril paid?"]
-    subtitles = ["Total DoD obligations · selected new entrants vs. selected primes",
-                 "Max(fixed-group net, 0) ÷ positive net obligations across configured pricing groups",
-                 "Fixed-price share by company · solid lines: new entrants; dashed lines: primes",
-                 "DoD obligations by contract pricing group · negative modifications retained"]
+    titles = ["Is the money shifting to new entrants?", f"Who gets paid on fixed-price terms in FY{data['latest_fy']}?",
+              "How has each company's pricing mix changed?", "How is Anduril paid?"]
+    subtitles = ["Each group's DoD obligations as a multiple of its first-year level, so both fit on one scale. Hover for dollar amounts; exact totals are in the table.",
+                 "Share of each company's DoD contract dollars on fixed-price contracts. Green bars are new entrants, blue bars are primes.",
+                 "Fixed-price share by company per fiscal year. Solid lines are new entrants, dashed lines are primes. Click a name in the legend to hide it.",
+                 "Anduril's DoD obligations by contract pricing type. Bars below zero are net downward modifications."]
     slugs = ["cohort-totals", "latest-fixed-share", "fixed-share-history", "anduril-pricing-mix"]
     sources = ["cohort_totals", "latest_shares", "share_history", "anduril_mix"]
     columns = [[("fy", "Fiscal year"), ("grp", "Cohort"), ("amount", "Net obligations")],
@@ -218,6 +261,8 @@ def render_dashboard(data, figures, takeaways, output_dir):
     caveats = "".join(f"<li>{escape(caveat)}</li>" for caveat in CAVEATS)
     export_note = ("All four chart PNGs are available for slides." if len(exports) == 4 else
                    "PNG export was unavailable or incomplete in this environment; the interactive charts remain available.")
+    stats = "".join(f"<div class='stat'><p class='stat-value'>{escape(value)}</p><p class='stat-label'>{escape(label)}</p></div>"
+                    for value, label in headline_stats(data))
     min_fy = min(row["fy"] for row in data["cohort_totals"])
     max_fy = max(row["fy"] for row in data["cohort_totals"])
     html = f"""<!doctype html>
@@ -242,13 +287,18 @@ details {{font-size:.88rem;margin-top:12px}} summary {{cursor:pointer;color:var(
 table {{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}} th,td {{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}} th {{background:var(--surface)}}
 footer {{padding:34px 0 50px;font-size:.9rem;color:var(--muted)}} footer p,footer li {{max-width:85ch}} footer h2 {{font-size:1.25rem;color:var(--ink)}} footer ul {{padding-left:20px}} .method {{display:flex;gap:12px 26px;flex-wrap:wrap}}
 .cohorts {{display:flex;gap:14px 30px;flex-wrap:wrap;font-size:.86rem;padding-top:4px;color:var(--muted)}} .cohorts p {{margin:0;max-width:60ch}}
+.stats {{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:0 0 24px}} .stat {{border:1px solid var(--line);border-radius:8px;padding:16px 18px}}
+.stat-value {{font-size:2.3rem;font-weight:650;line-height:1.1;margin:0 0 6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}} .stat-label {{margin:0;color:var(--muted);font-size:.9rem;line-height:1.4}}
+.explainer {{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px;background:var(--surface);border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:.92rem}} .explainer p {{margin:0}} .explainer strong {{display:block;color:var(--ink)}}
 noscript p {{padding:18px;background:var(--surface)}}
 @media(max-width:680px) {{header,main,footer {{width:calc(100% - 32px)}} header {{padding-top:32px}} h1 {{font-size:2.25rem}} h2 {{font-size:1.25rem}} section {{padding-top:28px}} .section-top {{align-items:flex-start;flex-direction:column;gap:6px}} nav {{gap:10px 20px}} .meta {{gap:6px 20px}} .takeaway {{font-size:1rem}} }}
 @media(prefers-reduced-motion:reduce) {{html {{scroll-behavior:auto}}}}
 </style></head><body><a class="skip" href="#analysis">Skip to analysis</a>
 <header><p class="eyebrow">DoD contract pricing · FY{min_fy}–FY{max_fy}</p><h1>How defense gets paid.</h1>
-<p class="intro">New defense-tech companies and traditional primes, compared through the pricing terms on their Department of Defense contracts.</p>
-<div class="meta"><span>Latest full year: FY{data['latest_fy']}</span><span>Source: USAspending.gov</span><span>Pulled: {escape(data['pull_end'][:10])} UTC</span></div></header>
+<p class="intro">New defense-tech companies and traditional primes, compared through the pricing terms on their Department of Defense contracts, using public USAspending.gov data.</p>
+<div class="stats">{stats}</div>
+<div class="explainer"><p><strong>Fixed-price</strong> The contractor agrees to a price up front and keeps the profit or eats the overrun. This is how commercial products are usually bought.</p><p><strong>Cost-plus</strong> The government reimburses the contractor's costs and adds a fee on top. This is the traditional model for large development programs.</p></div>
+<div class="meta"><span>Analysis by Keenan Francisco</span><span>Latest full year: FY{data['latest_fy']}</span><span>Source: USAspending.gov</span><span>Pulled: {escape(data['pull_end'][:10])} UTC</span></div></header>
 <main id="analysis"><nav aria-label="Analysis"><a href="#cohort-totals">Obligations</a><a href="#latest-fixed-share">Fixed-price ranking</a><a href="#fixed-share-history">Trends</a><a href="#anduril-pricing-mix">Anduril</a><a href="#method">Method</a></nav>
 <div class="cohorts"><p><strong>New entrants</strong> Anduril · Palantir · Shield AI</p><p><strong>Primes</strong> Lockheed Martin · RTX (Raytheon) · Northrop Grumman · General Dynamics · Boeing</p></div>
 <noscript><p>Enable JavaScript for interactive charts, or use each chart’s data table below.</p></noscript>{''.join(sections)}</main>
