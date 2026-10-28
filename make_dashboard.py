@@ -8,6 +8,7 @@ import sqlite3
 
 import plotly.graph_objects as go
 from plotly.offline import get_plotlyjs_version
+from plotly.subplots import make_subplots
 
 from pull import ENDPOINT, ROOT, load_config
 
@@ -18,9 +19,6 @@ GROUP_LABELS = {"fixed": "Fixed-price", "cost_plus": "Cost-reimbursement",
 COLORS = {"new_entrant": "rgb(94, 109, 35)", "prime": "rgb(68, 89, 119)",
           "fixed": "rgb(94, 109, 35)", "cost_plus": "rgb(68, 89, 119)",
           "time_materials": "rgb(184, 98, 49)", "other": "rgb(125, 128, 133)"}
-COMPANY_COLORS = ["rgb(94,109,35)", "rgb(18,125,117)", "rgb(180,113,29)",
-                  "rgb(68,89,119)", "rgb(151,62,71)", "rgb(101,83,147)",
-                  "rgb(80,118,151)", "rgb(128,96,66)"]
 CAVEATS = [
     "Other Transaction agreements (OTAs), a major route for new defense-tech awards, are largely not reported to USAspending and are outside award types A–D, so new entrants’ totals here likely understate their DoD business.",
     "Obligations, not outlays; modifications can be negative.",
@@ -40,12 +38,14 @@ def latest_full_fy(as_of=None):
 
 
 def money(amount):
-    magnitude = abs(amount)
+    sign, magnitude = ("-" if amount < 0 else ""), abs(amount)
     if magnitude >= 1_000_000_000:
-        return f"${amount / 1_000_000_000:,.2f}B"
+        return f"{sign}${magnitude / 1_000_000_000:,.2f}B"
     if magnitude >= 1_000_000:
-        return f"${amount / 1_000_000:,.1f}M"
-    return f"${amount:,.2f}"
+        return f"{sign}${magnitude / 1_000_000:,.1f}M"
+    if magnitude >= 1_000:
+        return f"{sign}${magnitude / 1_000:,.1f}K"
+    return f"{sign}${magnitude:,.2f}"
 
 
 def growth_index(totals, years, group):
@@ -152,7 +152,8 @@ def load_analysis(database):
         for key, filename in [("cohort_totals", "cohort_totals.sql"),
                               ("latest_shares", "latest_fixed_share.sql"),
                               ("share_history", "fixed_share_history.sql"),
-                              ("anduril_mix", "anduril_pricing_mix.sql")]:
+                              ("anduril_mix", "anduril_pricing_mix.sql"),
+                              ("reconciliation", "reconciliation.sql")]:
             data[key] = [dict(row) for row in conn.execute((ROOT / "queries" / filename).read_text(), {"latest_fy": latest})]
         data["company_totals"] = [dict(row) for row in conn.execute(
             "SELECT company, grp, fy, SUM(amount) AS amount FROM obligations GROUP BY company, grp, fy")]
@@ -160,6 +161,27 @@ def load_analysis(database):
         data["query_count"] = conn.execute("SELECT COUNT(*) FROM pull_metadata").fetchone()[0]
         data["pull_start"], data["pull_end"] = conn.execute("SELECT MIN(pulled_at), MAX(pulled_at) FROM pull_metadata").fetchone()
         data["exclusions"] = [dict(row) for row in conn.execute((ROOT / "queries/recipient_matching.sql").read_text())]
+        data["exclusion_sensitivity"] = [dict(row) for row in conn.execute("""
+            WITH included AS (
+                SELECT c.company, c.grp, ROUND(COALESCE(SUM(o.amount), 0), 2) AS included_total
+                FROM coverage c
+                LEFT JOIN obligations o ON o.company = c.company AND o.fy = c.fy
+                WHERE c.fy BETWEEN 2020 AND :latest_fy
+                GROUP BY c.company, c.grp
+            ), excluded AS (
+                SELECT company, ROUND(SUM(amount), 2) AS excluded_total
+                FROM recipient_exclusions
+                GROUP BY company
+            )
+            SELECT included.*, COALESCE(excluded_total, 0) AS excluded_total,
+                   COALESCE(excluded_total, 0) / NULLIF(included_total, 0) AS excluded_share
+            FROM included LEFT JOIN excluded USING (company)
+            ORDER BY grp, company
+        """, {"latest_fy": latest})]
+        for row in data["exclusion_sensitivity"]:
+            largest = next((excluded for excluded in data["exclusions"] if excluded["company"] == row["company"]), None)
+            row["largest_excluded"] = largest["recipient_name"] if largest else None
+            row["largest_excluded_amount"] = largest["amount"] if largest else None
     return data
 
 
@@ -188,16 +210,26 @@ def make_figures(data, companies):
                              cliponaxis=False, hovertemplate="%{y}: %{x:.2f}%<extra></extra>"))
     latest.update_layout(xaxis_title="Fixed-price share of positive group obligations (%)", showlegend=False,
                          margin=dict(l=140, r=65, t=30, b=60))
-    history = go.Figure()
-    for index, company in enumerate(companies):
-        rows = [row for row in data["share_history"] if row["company"] == company["name"]]
+    latest_shares = {row["company"]: row["share_fixed"] for row in data["latest_shares"] if row["share_fixed"] is not None}
+    panels = sorted(companies, key=lambda company: (company["group"] != "new_entrant", -latest_shares.get(company["name"], -1)))
+    history_years = list(range(2020, data["latest_fy"] + 1))
+    history = make_subplots(rows=2, cols=4, shared_yaxes="all", subplot_titles=[company["name"] for company in panels],
+                            horizontal_spacing=0.045, vertical_spacing=0.20)
+    for index, company in enumerate(panels):
+        rows = [row for row in data["share_history"] if row["company"] == company["name"] and row["fy"] in history_years]
         history.add_trace(go.Scatter(name=company["name"], x=[row["fy"] for row in rows],
                                      y=[None if row["share_fixed"] is None else row["share_fixed"] * 100 for row in rows],
-                                     mode="lines+markers", connectgaps=False,
-                                     line=dict(color=COMPANY_COLORS[index % len(COMPANY_COLORS)],
-                                               dash="solid" if company["group"] == "new_entrant" else "dash"),
-                                     hovertemplate="FY%{x}: %{y:.2f}%<extra>%{fullData.name}</extra>"))
-    history.update_layout(yaxis_title="Fixed-price share (%)")
+                                     mode="lines+markers", connectgaps=False, cliponaxis=False,
+                                     line=dict(color=COLORS[company["group"]], width=2.5), marker=dict(size=6),
+                                     hovertemplate=f"{company['name']} FY%{{x}}: %{{y:.1f}}%<extra></extra>"),
+                          row=index // 4 + 1, col=index % 4 + 1)
+    history.update_layout(showlegend=False, margin=dict(l=55, r=25, t=40, b=45))
+    history.update_annotations(font_size=14)
+    history.update_xaxes(tickmode="array", tickvals=history_years,
+                         ticktext=[f"FY{str(fy)[2:]}" if fy in (2020, data["latest_fy"]) else "" for fy in history_years],
+                         range=[2019.7, data["latest_fy"] + 0.3], tickfont_size=11)
+    history.update_yaxes(range=[0, 100], ticksuffix="%", dtick=25, tickfont_size=11)
+    history.update_yaxes(showticklabels=True, col=1)
     mix = go.Figure()
     lookup = {(row["fy"], row["pricing_group"]): row["amount"] for row in data["anduril_mix"]}
     for group, label in GROUP_LABELS.items():
@@ -206,20 +238,21 @@ def make_figures(data, companies):
     mix.update_layout(barmode="relative", yaxis_title="Net obligations ($M)")
     figures = [cohort, latest, history, mix]
     for index, figure in enumerate(figures):
-        figure.update_layout(template="plotly_white", height=420, autosize=True,
+        figure.update_layout(template="plotly_white", height=560 if index == 2 else 420, autosize=True,
                              font=dict(family="Arial, sans-serif", size=13, color="rgb(35,40,43)"),
                              paper_bgcolor="white", plot_bgcolor="white",
                              legend=dict(orientation="h", yanchor="bottom", y=1.04, x=0),
                              hoverlabel=dict(font_size=13))
-        if index != 1:
+        if index not in (1, 2):
             figure.update_layout(margin=dict(l=65, r=30, t=70, b=55))
             figure.update_xaxes(tickmode="array", tickvals=years, ticktext=[f"FY{str(fy)[2:]}" for fy in years])
         figure.update_yaxes(gridcolor="rgb(229,231,232)", zerolinecolor="rgb(155,160,163)")
     return figures
 
 
-def data_table(rows, columns):
-    header = "".join(f"<th scope='col'>{escape(label)}</th>" for _, label in columns)
+def data_table(rows, columns, visible=False):
+    numeric = {key: " class='numeric'" for key, _ in columns if visible and key not in {"company", "grp", "largest_excluded"}}
+    header = "".join(f"<th scope='col'{numeric.get(key, '')}>{escape(label)}</th>" for key, label in columns)
     body = []
     for row in rows:
         cells = []
@@ -227,13 +260,40 @@ def data_table(rows, columns):
             value = row.get(key)
             if key == "share_fixed":
                 text = "Undefined (zero positive total)" if value is None else f"{value:.2%}"
+            elif key == "excluded_share":
+                text = "Undefined (zero included total)" if value is None else f"{value:.2%}"
+            elif value is None:
+                text = "—"
+            elif key in numeric:
+                text = money(value)
             elif key in {"amount", "fixed_amount", "fixed_group_net", "total_amount"}:
                 text = f"${value:,.2f}"
             else:
                 text = str(value)
-            cells.append(f"<td>{escape(text)}</td>")
+            cells.append(f"<td{numeric.get(key, '')}>{escape(text)}</td>")
         body.append("<tr>" + "".join(cells) + "</tr>")
-    return f"<details><summary>View data table</summary><div class='table-scroll'><table><thead><tr>{header}</tr></thead><tbody>{''.join(body)}</tbody></table></div></details>"
+    table = f"<div class='table-scroll'><table><thead><tr>{header}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
+    return table if visible else f"<details><summary>View data table</summary>{table}</details>"
+
+
+def reconciliation_section(data):
+    fy = data["latest_fy"]
+    downward = -sum(row["negative_adjustment"] for row in data["reconciliation"])
+    largest = max(data["exclusions"], key=lambda row: abs(row["amount"]), default=None)
+    takeaway = f"Net downward pricing-group adjustments total {money(downward)} in FY{fy}; "
+    takeaway += (f"the largest single excluded name is {largest['recipient_name']} ({largest['company']}, {money(largest['amount'])})."
+                 if largest else "no excluded recipient names were recorded.")
+    totals = data_table(data["reconciliation"], [("company", "Company"), ("total_net", "Total net"),
+                        ("positive_group_total", "Positive total (denominator)"), ("negative_adjustment", "Negative adjustment"),
+                        ("fixed_group_net", "Fixed-group net"), ("fixed_numerator", "Fixed numerator"), ("share_fixed", "Fixed share")], visible=True)
+    sensitivity = data_table(data["exclusion_sensitivity"], [("company", "Company"), ("included_total", f"Included net, FY2020–{fy}"),
+                             ("excluded_total", "Excluded net, all years"), ("excluded_share", "Excluded / included"),
+                             ("largest_excluded", "Largest excluded name"), ("largest_excluded_amount", "Excluded name net")], visible=True)
+    return (f"<section id='reconciliation' aria-labelledby='heading-reconciliation'><h2 id='heading-reconciliation'>How the numbers reconcile</h2>"
+            "<p class='subtitle'>Every share above traces back to these totals. Use this to check the math or judge how sensitive it is to which legal entities are counted.</p>"
+            "<p class='subtitle'>Excluded names are fuzzy search hits our matching rules rejected (joint ventures, unrelated companies with similar names). Searches can overlap, so excluded amounts are an upper bound on attribution uncertainty, not money that belongs to the company.</p>"
+            f"<p class='takeaway'>{escape(takeaway)}</p><h3>FY{fy} share calculation</h3>{totals}"
+            f"<h3>Exclusion sensitivity</h3>{sensitivity}</section>")
 
 
 def render_dashboard(data, figures, takeaways, output_dir):
@@ -242,7 +302,7 @@ def render_dashboard(data, figures, takeaways, output_dir):
               "How has each company's pricing mix changed?", "How is Anduril paid?"]
     subtitles = ["Each group's DoD obligations as a multiple of its first-year level, so both fit on one scale. Hover for dollar amounts; exact totals are in the table.",
                  "Share of each company's DoD obligations on fixed-price contracts. Green bars are new entrants, blue bars are primes. Net downward modifications are floored at zero by pricing group, so a share cannot exceed 100%.",
-                 "Fixed-price share by company per fiscal year. Solid lines are new entrants, dashed lines are primes. Click a name in the legend to hide it.",
+                 "Fixed-price share by company per fiscal year, one panel per company on the same 0–100% scale. Green = new entrants, blue = primes.",
                  "Anduril's DoD obligations by contract pricing group. Bars below zero are net downward modifications."]
     slugs = ["cohort-totals", "latest-fixed-share", "fixed-share-history", "anduril-pricing-mix"]
     sources = ["cohort_totals", "latest_shares", "share_history", "anduril_mix"]
@@ -267,10 +327,14 @@ def render_dashboard(data, figures, takeaways, output_dir):
                                config={"responsive": True, "displaylogo": False, "scrollZoom": False,
                                        "toImageButtonOptions": {"format": "png", "filename": slug, "width": 1600, "height": 900}})
         download = f"<a class='download' href='img/{slug}.png' download>Download PNG</a>" if slug in exports else ""
+        chart_class = " class='history-scroll'" if index == 2 else ""
         sections.append(f"<section id='{slug}' aria-labelledby='heading-{slug}'><div class='section-top'><h2 id='heading-{slug}'>{escape(titles[index])}</h2>{download}</div>"
                         f"<p class='subtitle'>{escape(subtitles[index])}</p><p class='takeaway'>{escape(takeaways[index])}</p>"
-                        f"<div role='img' aria-label='{escape(titles[index])}. {escape(takeaways[index])}'>{chart}</div>"
+                        f"<div{chart_class} role='img' aria-label='{escape(titles[index])}. {escape(takeaways[index])}'>{chart}</div>"
                         f"{data_table(data[sources[index]], columns[index])}</section>")
+    sections.append(reconciliation_section(data))
+    brief_path = ROOT / "content" / "brief.html"
+    brief = brief_path.read_text() if brief_path.exists() else ""
     caveats = "".join(f"<li>{escape(caveat)}</li>" for caveat in CAVEATS)
     export_note = ("All four chart PNGs are available for slides." if len(exports) == 4 else
                    "PNG export was unavailable or incomplete in this environment; the interactive charts remain available.")
@@ -298,6 +362,7 @@ h2 {{font-size:1.55rem;line-height:1.3;font-weight:650;margin:0;text-wrap:balanc
 .subtitle {{color:var(--muted);font-size:.9rem;margin:8px 0 18px}} .takeaway {{border-left:3px solid var(--primary);padding:2px 0 2px 16px;margin:0 0 12px;font-size:1.04rem;max-width:85ch}}
 details {{font-size:.88rem;margin-top:12px}} summary {{cursor:pointer;color:var(--accent);width:fit-content;padding:6px 0}} .table-scroll {{overflow:auto;margin-top:10px}}
 table {{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}} th,td {{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}} th {{background:var(--surface)}}
+.brief {{background:var(--surface);border-radius:8px;padding:20px 24px;margin:24px 0 4px}} .brief h2 {{margin-bottom:8px}} .brief ul {{margin:0;padding-left:20px}} .brief li {{margin:10px 0;max-width:90ch}} .numeric {{text-align:right}} #reconciliation .table-scroll {{font-size:.88rem}} .history-scroll {{overflow-x:auto}} .history-scroll .plotly-graph-div {{min-width:820px}}
 footer {{padding:34px 0 50px;font-size:.9rem;color:var(--muted)}} footer p,footer li {{max-width:85ch}} footer h2 {{font-size:1.25rem;color:var(--ink)}} footer ul {{padding-left:20px}} .method {{display:flex;gap:12px 26px;flex-wrap:wrap}}
 .cohorts {{display:flex;gap:14px 30px;flex-wrap:wrap;font-size:.86rem;padding-top:4px;color:var(--muted)}} .cohorts p {{margin:0;max-width:60ch}}
 .scope {{font-size:.9rem;color:var(--muted);margin:0 0 18px;max-width:85ch}} .stats {{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:0 0 24px}} .stat {{border:1px solid var(--line);border-radius:8px;padding:16px 18px}}
@@ -313,9 +378,9 @@ noscript p {{padding:18px;background:var(--surface)}}
 <div class="explainer"><p><strong>Fixed-price</strong> The price is set up front (firm-fixed, or with incentive or price-adjustment terms), so the contractor carries most of the cost risk. FPDS codes A, B, J, K, L, M.</p><p><strong>Cost-reimbursement</strong> The government pays allowable costs, usually plus a fee (cost-plus), sometimes with no fee or shared costs, so the government carries most of the cost risk. FPDS codes R, S, T, U, V.</p></div>
 <p class="scope"><strong>Scope:</strong> obligations (money committed on contracts), not payments or revenue. Other Transaction agreements are largely not in this data, which likely understates the new entrants.</p>
 <div class="meta"><span>Analysis by Keenan Francisco</span><span>Latest full year: FY{data['latest_fy']}</span><span>Source: USAspending.gov</span><span>Pulled: {escape(data['pull_end'][:10])} UTC</span></div></header>
-<main id="analysis"><nav aria-label="Analysis"><a href="#cohort-totals">Obligations</a><a href="#latest-fixed-share">Fixed-price ranking</a><a href="#fixed-share-history">Trends</a><a href="#anduril-pricing-mix">Anduril</a><a href="#method">Method</a></nav>
+<main id="analysis"><nav aria-label="Analysis"><a href="#cohort-totals">Obligations</a><a href="#latest-fixed-share">Fixed-price ranking</a><a href="#fixed-share-history">Trends</a><a href="#anduril-pricing-mix">Anduril</a><a href="#reconciliation">Reconciliation</a><a href="#method">Method</a></nav>
 <div class="cohorts"><p><strong>New entrants</strong> Anduril · Palantir · Shield AI</p><p><strong>Primes</strong> Lockheed Martin · RTX (Raytheon) · Northrop Grumman · General Dynamics · Boeing</p></div>
-<noscript><p>Enable JavaScript for interactive charts, or use each chart’s data table below.</p></noscript>{''.join(sections)}</main>
+<noscript><p>Enable JavaScript for interactive charts, or use each chart’s data table below.</p></noscript>{brief}{''.join(sections)}</main>
 <footer id="method"><h2>Source &amp; method</h2><p>Net obligations on DoD-awarded contracts (award types A–D), grouped by transaction action date and fiscal year. Each of the 16 pricing codes is queried separately, all recipient pages are collected, and case-insensitive full-name regexes plus exact subsidiary lists select named legal entities. Fixed-price share is max(fixed-group net obligations, 0) divided by the sum of positive net obligations across configured pricing groups; a zero denominator is undefined.</p>
 <p>{data['row_count']:,} recipient/code/year rows · {data['query_count']:,} completed queries · pulled {escape(data['pull_end'][:10])}.</p>
 <p>{len(data['exclusions'])} company/name pairs were excluded by the matching rules; subsidiaries and joint ventures in this list remain attribution uncertainties.</p>

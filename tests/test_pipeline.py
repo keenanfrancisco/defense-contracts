@@ -5,13 +5,13 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import requests
 
 from pull import build_filters, fetch_pages, fiscal_year_dates, load_config, pull_query
 from build_db import build_database, matched_rows
-from make_dashboard import compute_takeaways, latest_full_fy
+from make_dashboard import compute_takeaways, latest_full_fy, load_analysis, make_figures, render_dashboard
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -336,6 +336,121 @@ class DatabaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_database(database, [], [ANDURIL], GROUPS, years=[2026])
             self.assertEqual(database.read_bytes(), b"existing database")
+
+
+class DashboardTests(unittest.TestCase):
+    def setUp(self):
+        self.companies, _ = load_config(ROOT)
+        companies = {company["name"]: company for company in self.companies}
+        samples = [
+            ("Anduril", 2019, "J", [("ANDURIL INDUSTRIES, INC.", 1000), ("OLD ANDURIL HIT", -1500)]),
+            ("Anduril", 2020, "J", [("ANDURIL INDUSTRIES, INC.", 20)]),
+            ("Anduril", 2025, "J", [("ANDURIL INDUSTRIES, INC.", -10.25)]),
+            ("Anduril", 2025, "R", [("ANDURIL INDUSTRIES, INC.", 5.15)]),
+            ("Anduril", 2026, "J", [("ANDURIL INDUSTRIES, INC.", 120.13), ("UNRELATED & <ANDURIL>", 100)]),
+            ("Anduril", 2026, "A", [("ANDURIL INDUSTRIES, INC.", -20.13), ("UNRELATED & <ANDURIL>", 100)]),
+            ("Anduril", 2026, "R", [("ANDURIL INDUSTRIES, INC.", -20.11)]),
+            ("Anduril", 2026, "Y", [("ANDURIL INDUSTRIES, INC.", 10.10)]),
+            ("Anduril", 2027, "J", [("ANDURIL INDUSTRIES, INC.", 9000), ("UNRELATED & <ANDURIL>", 300)]),
+            ("Palantir", 2026, "J", [("PALANTIR TECHNOLOGIES INC", -12.34), ("UNRELATED & <ANDURIL>", 100)]),
+            ("Palantir", 2026, "R", [("PALANTIR TECHNOLOGIES INC", 2.34)]),
+            ("Shield AI", 2026, "R", [("SHIELD AI INC", 20.01)]),
+            ("Boeing", 2026, "J", [("THE BOEING COMPANY", 30)]),
+            ("Boeing", 2026, "R", [("THE BOEING COMPANY", 10)]),
+            ("Lockheed Martin", 2026, "J", [("LOCKHEED MARTIN CORPORATION", 100)]),
+        ]
+        records = [record(companies[company], fy, code, [{"name": name, "amount": amount} for name, amount in rows])
+                   for company, fy, code, rows in samples]
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.database = Path(directory.name) / "contracts.db"
+        build_database(self.database, records, self.companies, GROUPS,
+                       years=[2019, 2020, 2025, 2026, 2027], require_complete=False)
+
+    def analysis(self):
+        with patch("make_dashboard.latest_full_fy", return_value=2026):
+            return load_analysis(self.database)
+
+    def test_reconciliation_matches_latest_shares_and_balances_net_totals(self):
+        with closing(sqlite3.connect(self.database)) as conn:
+            conn.row_factory = sqlite3.Row
+            for fy in (2025, 2026):
+                params = {"latest_fy": fy}
+                rows = [dict(row) for row in conn.execute((ROOT / "queries/reconciliation.sql").read_text(), params)]
+                latest = {row["company"]: dict(row) for row in conn.execute((ROOT / "queries/latest_fixed_share.sql").read_text(), params)}
+                self.assertEqual(len(rows), len(self.companies))
+                for row in rows:
+                    with self.subTest(fy=fy, company=row["company"]):
+                        self.assertEqual(row["share_fixed"], latest[row["company"]]["share_fixed"])
+                        self.assertLessEqual(row["negative_adjustment"], 0)
+                        self.assertAlmostEqual(row["positive_group_total"] + row["negative_adjustment"], row["total_net"], delta=0.01)
+                        total = conn.execute("SELECT COALESCE(SUM(amount), 0) FROM obligations WHERE company=? AND fy=?",
+                                             (row["company"], fy)).fetchone()[0]
+                        self.assertAlmostEqual(row["total_net"], total, delta=0.01)
+                by_company = {row["company"]: row for row in rows}
+                self.assertIsNone(by_company["RTX"]["share_fixed"])
+                if fy == 2026:
+                    anduril = by_company["Anduril"]
+                    self.assertEqual((anduril["total_net"], anduril["positive_group_total"], anduril["negative_adjustment"]),
+                                     (89.99, 110.10, -20.11))
+                    self.assertEqual((anduril["fixed_group_net"], anduril["fixed_numerator"]), (100, 100))
+                    self.assertEqual((by_company["Palantir"]["fixed_group_net"], by_company["Palantir"]["fixed_numerator"]), (-12.34, 0))
+                    self.assertEqual(by_company["Shield AI"]["share_fixed"], 0)
+
+    def test_exclusion_sensitivity_keeps_signs_all_excluded_years_and_overlapping_names(self):
+        rows = {row["company"]: row for row in self.analysis()["exclusion_sensitivity"]}
+        self.assertEqual(len(rows), len(self.companies))
+        anduril = rows["Anduril"]
+        self.assertAlmostEqual(anduril["included_total"], 104.89)
+        self.assertEqual(anduril["excluded_total"], -1000)
+        self.assertAlmostEqual(anduril["excluded_share"], -1000 / 104.89)
+        self.assertEqual((anduril["largest_excluded"], anduril["largest_excluded_amount"]), ("OLD ANDURIL HIT", -1500))
+        self.assertEqual(rows["Palantir"]["excluded_total"], 100)
+        self.assertEqual(rows["Palantir"]["excluded_share"], -10)
+        self.assertIsNone(rows["RTX"]["excluded_share"])
+        self.assertIsNone(rows["RTX"]["largest_excluded"])
+
+    def test_history_uses_eight_ordered_panels_with_shared_percent_scale(self):
+        figures = make_figures(self.analysis(), self.companies)
+        self.assertEqual(len(figures), 4)
+        history = figures[2]
+        expected = ["Anduril", "Palantir", "Shield AI", "Lockheed Martin", "Boeing", "RTX", "Northrop Grumman", "General Dynamics"]
+        self.assertEqual([title.text for title in history.layout.annotations], expected)
+        self.assertFalse(history.layout.showlegend)
+        self.assertEqual(history.layout.height, 560)
+        for index, trace in enumerate(history.data):
+            with self.subTest(company=trace.name):
+                self.assertEqual(trace.name, expected[index])
+                self.assertEqual(trace.xaxis, "x" if index == 0 else f"x{index + 1}")
+                self.assertEqual(trace.line.color.replace(" ", ""), "rgb(94,109,35)" if index < 3 else "rgb(68,89,119)")
+                self.assertEqual((trace.line.width, trace.marker.size), (2.5, 6))
+                self.assertEqual(trace.hovertemplate, f"{trace.name} FY%{{x}}: %{{y:.1f}}%<extra></extra>")
+                self.assertTrue(all(2020 <= fy <= 2026 for fy in trace.x))
+                xaxis = history.layout["xaxis" if index == 0 else f"xaxis{index + 1}"]
+                yaxis = history.layout["yaxis" if index == 0 else f"yaxis{index + 1}"]
+                self.assertEqual(list(xaxis.tickvals), list(range(2020, 2027)))
+                self.assertEqual(list(xaxis.ticktext), ["FY20", "", "", "", "", "", "FY26"])
+                self.assertEqual(list(yaxis.range), [0, 100])
+                self.assertEqual(yaxis.ticksuffix, "%")
+                self.assertTrue(yaxis.matches or index == 4)
+
+    def test_reconciliation_is_visible_with_two_numeric_tables_and_computed_takeaway(self):
+        data = self.analysis()
+        with tempfile.TemporaryDirectory() as directory, patch("plotly.graph_objects.Figure.write_image"):
+            render_dashboard(data, make_figures(data, self.companies), compute_takeaways(data), Path(directory))
+            html = (Path(directory) / "index.html").read_text()
+        self.assertIn('<a href="#reconciliation">Reconciliation</a>', html)
+        self.assertLess(html.index("<section id='anduril-pricing-mix'"), html.index("<section id='reconciliation'"))
+        section = html.split("<section id='reconciliation'", 1)[1].split("</section>", 1)[0]
+        self.assertIn("How the numbers reconcile", section)
+        self.assertEqual(section.count("<table>"), 2)
+        self.assertEqual(section.count("class='table-scroll'"), 2)
+        self.assertNotIn("<details>", section)
+        self.assertIn("class='numeric'", section)
+        self.assertIn("$32.45", section)
+        self.assertIn("OLD ANDURIL HIT (Anduril, -$1.5K)", section)
+        self.assertIn("UNRELATED &amp; &lt;ANDURIL&gt;", section)
+        self.assertIn("Searches can overlap", section)
 
 
 class AnalysisTests(unittest.TestCase):
