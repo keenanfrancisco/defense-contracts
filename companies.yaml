@@ -1,0 +1,86 @@
+# Case-insensitive full-name matches. Explicit subsidiaries are exact recipient
+# names; joint ventures and uncertain names remain excluded.
+companies:
+  - name: Anduril
+    group: new_entrant
+    search_terms: [Anduril]
+    subsidiaries: []
+    include_regex: 'ANDURIL INDUSTRIES(?:,? (?:INC|LLC|CORP|CORPORATION)\.?)?'
+  - name: Palantir
+    group: new_entrant
+    search_terms: [Palantir]
+    subsidiaries: []
+    include_regex: 'PALANTIR (?:TECHNOLOGIES|USG)(?:,? (?:INC|LLC|CORP|CORPORATION)\.?)?'
+  - name: Shield AI
+    group: new_entrant
+    search_terms: [Shield AI]
+    subsidiaries:
+      - HERON SYSTEMS
+      - MARTIN UAV LLC
+    include_regex: 'SHIELD AI(?:,? (?:INC|LLC|CORP|CORPORATION)\.?)?'
+  - name: Lockheed Martin
+    group: prime
+    search_terms: [Lockheed Martin]
+    subsidiaries:
+      - SIKORSKY AIRCRAFT CORPORATION
+      - SIKORSKY SUPPORT SERVICES INC
+      - LOCKHEED MISSILES & SPACE COMP
+      - DERCO AEROSPACE
+    include_regex: 'LOCKHEED MARTIN(?:[ ,.-][A-Z0-9 &,().-]+)?'
+  - name: RTX
+    group: prime
+    search_terms: [Raytheon, RTX, Pratt & Whitney, Collins Aerospace, Rockwell Collins]
+    subsidiaries:
+      - RTX BBN TECHNOLOGIES
+      - GOODRICH CORPORATION
+      - HAMILTON SUNDSTRAND CORPORATION
+      - ROSEMOUNT AEROSPACE INC
+      - SIMMONDS PRECISION PRODUCTS INC
+      - COLLINS ENGINE NOZZLES, INC
+    include_regex: '(?:RAYTHEON|RTX|PRATT(?: &| AND) WHITNEY|COLLINS AEROSPACE|ROCKWELL COLLINS)(?:[ ,.-][A-Z0-9 &,().-]+)?'
+  - name: Northrop Grumman
+    group: prime
+    search_terms: [Northrop Grumman]
+    subsidiaries:
+      - ORBITAL SCIENCES LLC
+      - ATK LAUNCH SYSTEMS INC.
+      - ATK LAUNCH SYSTEMS LLC
+      - ATK SPACE SYSTEMS LLC
+      - ALLIANT TECHSYSTEMS OPERATIONS LLC
+      - SCALED COMPOSITES
+      - SPACE LOGISTICS LLC
+      - REMOTEC
+      - COI CERAMICS
+      - VINNELL ARABIA
+      - CUTTING EDGE OPTRONICS INC
+      - MICRO CRAFT INC
+    include_regex: 'NORTHROP GRUMMAN(?:[ ,.-][A-Z0-9 &,().-]+)?'
+  - name: General Dynamics
+    group: prime
+    search_terms: [General Dynamics]
+    subsidiaries:
+      - ELECTRIC BOAT CORPORATION
+      - BATH IRON WORKS CORPORATION
+      - NATIONAL STEEL AND SHIPBUILDING COMPANY
+      - GULFSTREAM AEROSPACE CORPORATION
+      - CSRA LLC
+      - METRO MACHINE CORP
+      - AMERICAN OVERSEAS MARINE CO. LLC
+      - JET AVIATION ST. LOUIS
+      - APPLIED PHYSICAL SCIENCES CORP
+    include_regex: 'GENERAL DYNAMICS(?:[ ,.-][A-Z0-9 &,().-]+)?'
+  - name: Boeing
+    group: prime
+    search_terms: [Boeing]
+    subsidiaries:
+      - INSITU
+      - AURORA FLIGHT SCIENCES CORPORATION
+      - ARGON ST
+      - MILLENNIUM SPACE SYSTEMS
+      - SPECTROLAB
+      - LIQUID ROBOTICS
+      - TAPESTRY SOLUTIONS
+      - DIGITAL RECEIVER TECHNOLOGY
+      - MCDONNELL DOUGLAS HELICOPTER C
+      - WISK AERO LLC
+    include_regex: '(?:THE )?BOEING[ -](?!SIKORSKY\b)[A-Z0-9 &,().-]+'

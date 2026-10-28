@@ -1,0 +1,6 @@
+data/raw/
+data/contracts.db
+data/contracts.db-*
+data/contracts.db.tmp
+__pycache__/
+.venv/

@@ -1,0 +1,4 @@
+fixed: [A, B, J, K, L, M]
+cost_plus: [R, S, T, U, V]
+time_materials: [Y, Z]
+other: ['1', '2', '3']

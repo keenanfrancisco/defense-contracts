@@ -1,0 +1,35 @@
+{
+  "recorded_on": "2026-10-27",
+  "endpoint": "https://api.usaspending.gov/api/v2/search/spending_by_category/recipient/",
+  "request": {
+    "filters": {
+      "time_period": [{"start_date": "2025-10-01", "end_date": "2026-09-30"}],
+      "agencies": [{"type": "awarding", "tier": "toptier", "name": "Department of Defense"}],
+      "award_type_codes": ["A", "B", "C", "D"],
+      "recipient_search_text": ["Anduril"],
+      "contract_pricing_type_codes": ["J"]
+    },
+    "spending_level": "transactions",
+    "limit": 1
+  },
+  "pages": [
+    {
+      "category": "recipient", "spending_level": "transactions", "limit": 1,
+      "page_metadata": {"page": 1, "next": 2, "previous": null, "hasNext": true, "hasPrevious": false},
+      "results": [{"amount": 487341086.41, "recipient_id": "1869c03a-77bb-b66c-469b-988719bbec4c-C", "name": "ANDURIL INDUSTRIES, INC.", "code": "080788349", "uei": "KC3CH2MSK7Q3", "total_outlays": null}],
+      "messages": ["For searches, time period start and end dates are currently limited to an earliest date of 2007-10-01.  For data going back to 2000-10-01, use either the Custom Award Download feature on the website or one of our download or bulk_download API endpoints as listed on https://api.usaspending.gov/docs/endpoints. ", "'subawards' will be deprecated in the future. Set ‘spending_level’ to ‘subawards’ instead. See documentation for more information. "]
+    },
+    {
+      "category": "recipient", "spending_level": "transactions", "limit": 1,
+      "page_metadata": {"page": 2, "next": 3, "previous": 1, "hasNext": true, "hasPrevious": true},
+      "results": [{"amount": 153563617.67, "recipient_id": "2a212f3e-861e-ccc5-cb20-8f2cd8747c03-C", "name": "ANDURIL INDUSTRIES, INC.", "code": "117720225", "uei": "JA9NV8H3L2T9", "total_outlays": null}],
+      "messages": ["For searches, time period start and end dates are currently limited to an earliest date of 2007-10-01.  For data going back to 2000-10-01, use either the Custom Award Download feature on the website or one of our download or bulk_download API endpoints as listed on https://api.usaspending.gov/docs/endpoints. ", "'subawards' will be deprecated in the future. Set ‘spending_level’ to ‘subawards’ instead. See documentation for more information. "]
+    },
+    {
+      "category": "recipient", "spending_level": "transactions", "limit": 1,
+      "page_metadata": {"page": 3, "next": null, "previous": 2, "hasNext": false, "hasPrevious": true},
+      "results": [{"amount": 0, "recipient_id": "15651138-1459-f99d-356a-c81e6e0dc4d9-C", "name": "ANDURIL INDUSTRIES, INC.", "code": null, "uei": "T7XMQQPLGTJ1", "total_outlays": null}],
+      "messages": ["For searches, time period start and end dates are currently limited to an earliest date of 2007-10-01.  For data going back to 2000-10-01, use either the Custom Award Download feature on the website or one of our download or bulk_download API endpoints as listed on https://api.usaspending.gov/docs/endpoints. ", "'subawards' will be deprecated in the future. Set ‘spending_level’ to ‘subawards’ instead. See documentation for more information. "]
+    }
+  ]
+}
