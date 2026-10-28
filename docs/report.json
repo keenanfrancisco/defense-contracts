@@ -1,10 +1,10 @@
 {
-  "row_count": 6262,
+  "row_count": 6304,
   "latest_full_fy": 2026,
   "pull_start": "2026-10-27T13:04:01.442998+00:00",
   "pull_end": "2026-10-27T13:22:57.591714+00:00",
   "takeaways": [
-    "In FY2026, new entrants receive 1.4% of these cohorts’ combined DoD obligations ($1.98B versus $140.28B for the primes). Growth: new entrants 11.7x since FY2020. The primes ranged from $111.83B to $157.34B a year over the same period. Palantir accounts for 67% of the new entrants' FY2026 total.",
+    "In FY2026, new entrants receive 1.3% of these cohorts’ combined DoD obligations ($1.98B versus $149.71B for the primes). Growth: new entrants 11.6x since FY2020. The primes ranged from $111.86B to $171.71B a year over the same period. Palantir accounts for 67% of the new entrants' FY2026 total.",
     "Palantir and Shield AI tie for the highest fixed-price share in FY2026, at 100.0% of their positive pricing-group obligations.",
     "Northrop Grumman’s fixed-price share decreased 44.4 percentage points from FY2020 to FY2026, the largest absolute change among companies with comparable endpoints.",
     "In FY2026, fixed-price accounts for 99.7% of Anduril’s $642.9M in net DoD obligations."
@@ -52,6 +52,14 @@
     },
     {
       "company": "Boeing",
+      "recipient_name": "INSITUFORM TECHNOLOGIES USA, LLC",
+      "amount": 4374470.5,
+      "first_fy": 2024,
+      "last_fy": 2026,
+      "result_rows": 3
+    },
+    {
+      "company": "Boeing",
       "recipient_name": "SPIRIT AEROSYSTEMS INC",
       "amount": 1225584.61,
       "first_fy": 2026,
@@ -70,6 +78,22 @@
       "company": "Boeing",
       "recipient_name": "INVENTORY LOCATOR SERVICE, LLC",
       "amount": 359154.0,
+      "first_fy": 2020,
+      "last_fy": 2020,
+      "result_rows": 1
+    },
+    {
+      "company": "Boeing",
+      "recipient_name": "INSITUFORM TECHNOLOGIES, LLC",
+      "amount": 207000.0,
+      "first_fy": 2023,
+      "last_fy": 2025,
+      "result_rows": 3
+    },
+    {
+      "company": "Boeing",
+      "recipient_name": "MCDONNELL DOUGLAS CORPORATION",
+      "amount": 0.0,
       "first_fy": 2020,
       "last_fy": 2020,
       "result_rows": 1
@@ -148,6 +172,14 @@
     },
     {
       "company": "General Dynamics",
+      "recipient_name": "CSRA INFORMATION SYSTEMS LLC",
+      "amount": -5331207.34,
+      "first_fy": 2020,
+      "last_fy": 2022,
+      "result_rows": 5
+    },
+    {
+      "company": "General Dynamics",
       "recipient_name": "GCI INC",
       "amount": 4095232.9,
       "first_fy": 2020,
@@ -161,6 +193,22 @@
       "first_fy": 2020,
       "last_fy": 2022,
       "result_rows": 5
+    },
+    {
+      "company": "General Dynamics",
+      "recipient_name": "METRO MACHINE WORKS INC",
+      "amount": 2518058.0,
+      "first_fy": 2020,
+      "last_fy": 2025,
+      "result_rows": 6
+    },
+    {
+      "company": "General Dynamics",
+      "recipient_name": "JET AVIATION SPECIALISTS LLC",
+      "amount": 1843374.27,
+      "first_fy": 2020,
+      "last_fy": 2026,
+      "result_rows": 7
     },
     {
       "company": "General Dynamics",
@@ -220,6 +268,22 @@
     },
     {
       "company": "General Dynamics",
+      "recipient_name": "CSRA SYSTEMS & SOLUTIONS LLC",
+      "amount": 0.0,
+      "first_fy": 2020,
+      "last_fy": 2020,
+      "result_rows": 1
+    },
+    {
+      "company": "General Dynamics",
+      "recipient_name": "GULFSTREAM AEROSPACE LP",
+      "amount": 0.0,
+      "first_fy": 2020,
+      "last_fy": 2020,
+      "result_rows": 1
+    },
+    {
+      "company": "General Dynamics",
       "recipient_name": "KEI PEARSON, INC",
       "amount": 0.0,
       "first_fy": 2025,
@@ -233,6 +297,14 @@
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 18
+    },
+    {
+      "company": "Lockheed Martin",
+      "recipient_name": "BOEING SIKORSKY AIRCRAFT SUPPORT, LLC",
+      "amount": 940114348.32,
+      "first_fy": 2020,
+      "last_fy": 2026,
+      "result_rows": 19
     },
     {
       "company": "Lockheed Martin",
@@ -300,6 +372,22 @@
     },
     {
       "company": "Northrop Grumman",
+      "recipient_name": "AEROSPACE LOGISTICS LIMITED",
+      "amount": 3300.0,
+      "first_fy": 2020,
+      "last_fy": 2021,
+      "result_rows": 2
+    },
+    {
+      "company": "Northrop Grumman",
+      "recipient_name": "ALLIANT TECHSYSTEMS INC",
+      "amount": 0.0,
+      "first_fy": 2024,
+      "last_fy": 2024,
+      "result_rows": 1
+    },
+    {
+      "company": "Northrop Grumman",
       "recipient_name": "MISSION RESEARCH CORPORATION",
       "amount": 0.0,
       "first_fy": 2025,
@@ -317,7 +405,7 @@
     {
       "company": "RTX",
       "recipient_name": "DATA LINK SOLUTIONS LLC",
-      "amount": 1999990387.17,
+      "amount": 2217925799.68,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 24
@@ -349,7 +437,7 @@
     {
       "company": "RTX",
       "recipient_name": "SOLIPSYS CORPORATION",
-      "amount": 170927838.07,
+      "amount": 184092844.45,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 16
@@ -365,7 +453,7 @@
     {
       "company": "RTX",
       "recipient_name": "INTERTRADE LIMITED",
-      "amount": 127230460.68,
+      "amount": 142194602.22,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 7
@@ -373,7 +461,7 @@
     {
       "company": "RTX",
       "recipient_name": "EVERFOX LLC",
-      "amount": 106839864.42,
+      "amount": 117469117.13,
       "first_fy": 2020,
       "last_fy": 2024,
       "result_rows": 17
@@ -404,6 +492,14 @@
     },
     {
       "company": "RTX",
+      "recipient_name": "HORNET ACQUISITIONCO, LLC",
+      "amount": 70743086.9,
+      "first_fy": 2020,
+      "last_fy": 2026,
+      "result_rows": 7
+    },
+    {
+      "company": "RTX",
       "recipient_name": "ARINC INCORPORATED",
       "amount": 65760658.81,
       "first_fy": 2020,
@@ -413,7 +509,7 @@
     {
       "company": "RTX",
       "recipient_name": "ROHR, INC.",
-      "amount": 58881288.95,
+      "amount": 65651544.77,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 12
@@ -428,16 +524,8 @@
     },
     {
       "company": "RTX",
-      "recipient_name": "HORNET ACQUISITIONCO, LLC",
-      "amount": 44519020.02,
-      "first_fy": 2020,
-      "last_fy": 2026,
-      "result_rows": 7
-    },
-    {
-      "company": "RTX",
       "recipient_name": "AMI INDUSTRIES, INC",
-      "amount": 32121333.39,
+      "amount": 32812322.61,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 9
@@ -445,7 +533,7 @@
     {
       "company": "RTX",
       "recipient_name": "KIDDE TECHNOLOGIES INC",
-      "amount": 23428367.55,
+      "amount": 28985975.87,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 6
@@ -460,8 +548,16 @@
     },
     {
       "company": "RTX",
+      "recipient_name": "GOODRICH CONTROL SYSTEMS",
+      "amount": 21385077.56,
+      "first_fy": 2020,
+      "last_fy": 2026,
+      "result_rows": 8
+    },
+    {
+      "company": "RTX",
       "recipient_name": "SAFRAN ACTUATION SYSTEMS UK LIMITED",
-      "amount": 19787956.66,
+      "amount": 20986515.71,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 7
@@ -476,16 +572,24 @@
     },
     {
       "company": "RTX",
-      "recipient_name": "GOODRICH CONTROL SYSTEMS",
-      "amount": 17636778.76,
+      "recipient_name": "ATLANTIC INERTIAL SYSTEMS INC",
+      "amount": 17100660.41,
       "first_fy": 2020,
       "last_fy": 2026,
-      "result_rows": 8
+      "result_rows": 7
     },
     {
       "company": "RTX",
-      "recipient_name": "ATLANTIC INERTIAL SYSTEMS INC",
-      "amount": 16205661.41,
+      "recipient_name": "GOODRICH LIGHTING SYSTEMS INC",
+      "amount": 10501712.17,
+      "first_fy": 2020,
+      "last_fy": 2026,
+      "result_rows": 7
+    },
+    {
+      "company": "RTX",
+      "recipient_name": "GOODRICH GAS INC",
+      "amount": 7744777.77,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 7
@@ -493,18 +597,10 @@
     {
       "company": "RTX",
       "recipient_name": "HAMILTON SUNSTRAND AVIATION SERVICES INC",
-      "amount": 6512581.39,
+      "amount": 7512929.49,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 6
-    },
-    {
-      "company": "RTX",
-      "recipient_name": "GOODRICH LIGHTING SYSTEMS INC",
-      "amount": 6405500.72,
-      "first_fy": 2020,
-      "last_fy": 2024,
-      "result_rows": 5
     },
     {
       "company": "RTX",
@@ -513,6 +609,14 @@
       "first_fy": 2024,
       "last_fy": 2026,
       "result_rows": 3
+    },
+    {
+      "company": "RTX",
+      "recipient_name": "GOODRICH LIMITED",
+      "amount": 5549578.69,
+      "first_fy": 2020,
+      "last_fy": 2026,
+      "result_rows": 7
     },
     {
       "company": "RTX",
@@ -532,14 +636,6 @@
     },
     {
       "company": "RTX",
-      "recipient_name": "GOODRICH LIMITED",
-      "amount": 4744804.79,
-      "first_fy": 2020,
-      "last_fy": 2026,
-      "result_rows": 7
-    },
-    {
-      "company": "RTX",
       "recipient_name": "MACROLINK, INC.",
       "amount": 4050298.56,
       "first_fy": 2020,
@@ -549,15 +645,15 @@
     {
       "company": "RTX",
       "recipient_name": "ROSEMOUNT AEROSPACE LIMITED",
-      "amount": 2687182.76,
-      "first_fy": 2021,
+      "amount": 3667457.76,
+      "first_fy": 2020,
       "last_fy": 2025,
-      "result_rows": 4
+      "result_rows": 5
     },
     {
       "company": "RTX",
       "recipient_name": "WOVEN ELECTRONICS, LLC",
-      "amount": 2037515.43,
+      "amount": 2394658.33,
       "first_fy": 2020,
       "last_fy": 2026,
       "result_rows": 7

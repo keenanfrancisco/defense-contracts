@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from pull import build_filters, fetch_pages, fiscal_year_dates, load_config, pull_query
-from build_db import build_database, matched_rows
+from build_db import build_database, matched_rows, merge_search_results
 from make_dashboard import compute_takeaways, latest_full_fy, load_analysis, make_figures, render_dashboard
 
 
@@ -161,7 +161,11 @@ class PullTests(unittest.TestCase):
         }
         self.assertEqual({name: by_name[name]["subsidiaries"] for name in expected}, expected)
         self.assertEqual(by_name["RTX"]["search_terms"],
-                         ["Raytheon", "RTX", "Pratt & Whitney", "Collins Aerospace", "Rockwell Collins"])
+                         ["Raytheon", "RTX", "Pratt & Whitney", "Collins Aerospace", "Rockwell Collins",
+                          "Goodrich", "Hamilton Sundstrand", "Rosemount Aerospace", "Simmonds Precision"])
+        # Parent-name searches can miss subsidiaries entirely (Electric Boat FY2025), so each is searched directly.
+        self.assertIn("Electric Boat", by_name["General Dynamics"]["search_terms"])
+        self.assertIn("Sikorsky", by_name["Lockheed Martin"]["search_terms"])
         self.assertTrue(all(isinstance(company["search_terms"], list) for company in companies))
         self.assertTrue(all(isinstance(company["subsidiaries"], list) for company in companies))
 
@@ -336,6 +340,16 @@ class DatabaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_database(database, [], [ANDURIL], GROUPS, years=[2026])
             self.assertEqual(database.read_bytes(), b"existing database")
+
+
+    def test_merge_keeps_most_complete_result_per_recipient(self):
+        parent = {"search_term": "General Dynamics", "pages": [{"results": [
+            {"name": "ELECTRIC BOAT CORPORATION", "recipient_id": "eb", "amount": 0.37}]}]}
+        direct = {"search_term": "Electric Boat", "pages": [{"results": [
+            {"name": "ELECTRIC BOAT CORPORATION", "recipient_id": "eb", "amount": 1.87}]}]}
+        for records in ([parent, direct], [direct, parent]):
+            merged = merge_search_results(records)
+            self.assertEqual([row["amount"] for row in merged], [1.87])
 
 
 class DashboardTests(unittest.TestCase):

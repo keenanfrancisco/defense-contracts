@@ -67,24 +67,23 @@ def _search_term(record, company):
 
 
 def merge_search_results(records):
-    """Join search results without counting the same USAspending recipient twice."""
-    seen_terms = {}
+    """Join search results without counting the same USAspending recipient twice.
+
+    A search term filters transactions, not just recipients: "General Dynamics" returns
+    only the Electric Boat transactions that mention the parent. Each result is a subset
+    of the recipient's true total, so keep the largest one per recipient.
+    """
+    best = {}
     merged = []
     for record in records:
-        term = record.get("search_term")
-        if term is None:
-            terms = record["request"]["filters"].get("recipient_search_text", [])
-            term = terms[0] if len(terms) == 1 else None
         for page in record["pages"]:
             for result in page["results"]:
                 identity = _recipient_identity(result)
-                prior_term = seen_terms.get(identity) if identity is not None else None
-                if prior_term is not None and prior_term != term:
-                    continue
-                if identity is not None:
-                    seen_terms.setdefault(identity, term)
-                merged.append(result)
-    return merged
+                if identity is None:
+                    merged.append(result)
+                elif identity not in best or abs(result["amount"]) > abs(best[identity]["amount"]):
+                    best[identity] = result
+    return merged + list(best.values())
 
 
 def build_database(database, records, companies, groups, years=YEARS, require_complete=True):
