@@ -96,7 +96,7 @@ Pricing groups are editable in `pricing_codes.yaml`:
 | Group | Transaction pricing codes |
 | --- | --- |
 | Fixed-price | A, B, J, K, L, M |
-| Cost-plus | R, S, T, U, V |
+| Cost-reimbursement (cost-plus, cost-no-fee, cost-sharing) | R, S, T, U, V |
 | Time & materials | Y, Z |
 | Other | 1, 2, 3 |
 

@@ -12,7 +12,7 @@ from plotly.offline import get_plotlyjs_version
 from pull import ENDPOINT, ROOT, load_config
 
 
-GROUP_LABELS = {"fixed": "Fixed-price", "cost_plus": "Cost-plus",
+GROUP_LABELS = {"fixed": "Fixed-price", "cost_plus": "Cost-reimbursement",
                 "time_materials": "Time & materials", "other": "Other"}
 # Plotly's canvas renderer accepts sRGB strings. The page theme uses OKLCH.
 COLORS = {"new_entrant": "rgb(94, 109, 35)", "prime": "rgb(68, 89, 119)",
@@ -22,6 +22,7 @@ COMPANY_COLORS = ["rgb(94,109,35)", "rgb(18,125,117)", "rgb(180,113,29)",
                   "rgb(68,89,119)", "rgb(151,62,71)", "rgb(101,83,147)",
                   "rgb(80,118,151)", "rgb(128,96,66)"]
 CAVEATS = [
+    "Other Transaction agreements (OTAs), a major route for new defense-tech awards, are largely not reported to USAspending and are outside award types A–D, so new entrants’ totals here likely understate their DoD business.",
     "Obligations, not outlays; modifications can be negative.",
     "Recipient matching is by name; subsidiaries outside the explicit list may be missed or mis-assigned.",
     "FY2026 data may still be updating (fiscal year ended 2026-09-30).",
@@ -92,7 +93,7 @@ def compute_takeaways(data):
     if pieces:
         first += " Growth: " + pieces[0] + "."
     if prime_years:
-        first += f" The primes moved between {money(min(prime_years))} and {money(max(prime_years))} a year with no clear trend."
+        first += f" The primes ranged from {money(min(prime_years))} to {money(max(prime_years))} a year over the same period."
     by_company = {}
     for row in data.get("company_totals", []):
         if row["fy"] == fy and row["grp"] == "new_entrant":
@@ -240,9 +241,9 @@ def render_dashboard(data, figures, takeaways, output_dir):
     titles = ["Is the money shifting to new entrants?", f"Who gets paid on fixed-price terms in FY{data['latest_fy']}?",
               "How has each company's pricing mix changed?", "How is Anduril paid?"]
     subtitles = ["Each group's DoD obligations as a multiple of its first-year level, so both fit on one scale. Hover for dollar amounts; exact totals are in the table.",
-                 "Share of each company's DoD contract dollars on fixed-price contracts. Green bars are new entrants, blue bars are primes.",
+                 "Share of each company's DoD obligations on fixed-price contracts. Green bars are new entrants, blue bars are primes. Net downward modifications are floored at zero by pricing group, so a share cannot exceed 100%.",
                  "Fixed-price share by company per fiscal year. Solid lines are new entrants, dashed lines are primes. Click a name in the legend to hide it.",
-                 "Anduril's DoD obligations by contract pricing type. Bars below zero are net downward modifications."]
+                 "Anduril's DoD obligations by contract pricing group. Bars below zero are net downward modifications."]
     slugs = ["cohort-totals", "latest-fixed-share", "fixed-share-history", "anduril-pricing-mix"]
     sources = ["cohort_totals", "latest_shares", "share_history", "anduril_mix"]
     columns = [[("fy", "Fiscal year"), ("grp", "Cohort"), ("amount", "Net obligations")],
@@ -280,7 +281,7 @@ def render_dashboard(data, figures, takeaways, output_dir):
     html = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="A repeatable comparison of DoD contract pricing for eight defense-tech companies and traditional primes, FY2020–FY2026.">
-<title>How Defense Gets Paid · DoD Contract Pricing</title>
+<title>DoD Contract Pricing</title>
 <script src="https://cdn.plot.ly/plotly-{get_plotlyjs_version()}.min.js" charset="utf-8"></script>
 <style>
 :root {{ --bg:oklch(1 0 0); --ink:oklch(.25 .008 110); --muted:oklch(.44 .012 110); --primary:oklch(.49 .09 110); --accent:oklch(.43 .06 250); --line:oklch(.88 .008 110); --surface:oklch(.97 0 0); }}
@@ -299,23 +300,24 @@ details {{font-size:.88rem;margin-top:12px}} summary {{cursor:pointer;color:var(
 table {{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}} th,td {{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}} th {{background:var(--surface)}}
 footer {{padding:34px 0 50px;font-size:.9rem;color:var(--muted)}} footer p,footer li {{max-width:85ch}} footer h2 {{font-size:1.25rem;color:var(--ink)}} footer ul {{padding-left:20px}} .method {{display:flex;gap:12px 26px;flex-wrap:wrap}}
 .cohorts {{display:flex;gap:14px 30px;flex-wrap:wrap;font-size:.86rem;padding-top:4px;color:var(--muted)}} .cohorts p {{margin:0;max-width:60ch}}
-.stats {{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:0 0 24px}} .stat {{border:1px solid var(--line);border-radius:8px;padding:16px 18px}}
+.scope {{font-size:.9rem;color:var(--muted);margin:0 0 18px;max-width:85ch}} .stats {{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:0 0 24px}} .stat {{border:1px solid var(--line);border-radius:8px;padding:16px 18px}}
 .stat-value {{font-size:2.3rem;font-weight:650;line-height:1.1;margin:0 0 6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}} .stat-label {{margin:0;color:var(--muted);font-size:.9rem;line-height:1.4}}
 .explainer {{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px;background:var(--surface);border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:.92rem}} .explainer p {{margin:0}} .explainer strong {{display:block;color:var(--ink)}}
 noscript p {{padding:18px;background:var(--surface)}}
 @media(max-width:680px) {{header,main,footer {{width:calc(100% - 32px)}} header {{padding-top:32px}} h1 {{font-size:2.25rem}} h2 {{font-size:1.25rem}} section {{padding-top:28px}} .section-top {{align-items:flex-start;flex-direction:column;gap:6px}} nav {{gap:10px 20px}} .meta {{gap:6px 20px}} .takeaway {{font-size:1rem}} }}
 @media(prefers-reduced-motion:reduce) {{html {{scroll-behavior:auto}}}}
 </style></head><body><a class="skip" href="#analysis">Skip to analysis</a>
-<header><p class="eyebrow">DoD contract pricing · FY{min_fy}–FY{max_fy}</p><h1>How defense gets paid.</h1>
+<header><p class="eyebrow">DoD contract pricing · FY{min_fy}–FY{max_fy}</p><h1>Who carries the cost risk on DoD contracts?</h1>
 <p class="intro">New defense-tech companies and traditional primes, compared through the pricing terms on their Department of Defense contracts, using public USAspending.gov data.</p>
 <div class="stats">{stats}</div>
-<div class="explainer"><p><strong>Fixed-price</strong> The contractor agrees to a price up front and keeps the profit or eats the overrun. This is how commercial products are usually bought.</p><p><strong>Cost-plus</strong> The government reimburses the contractor's costs and adds a fee on top. This is the traditional model for large development programs.</p></div>
+<div class="explainer"><p><strong>Fixed-price</strong> The price is set up front (firm-fixed, or with incentive or price-adjustment terms), so the contractor carries most of the cost risk. FPDS codes A, B, J, K, L, M.</p><p><strong>Cost-reimbursement</strong> The government pays allowable costs, usually plus a fee (cost-plus), sometimes with no fee or shared costs, so the government carries most of the cost risk. FPDS codes R, S, T, U, V.</p></div>
+<p class="scope"><strong>Scope:</strong> obligations (money committed on contracts), not payments or revenue. Other Transaction agreements are largely not in this data, which likely understates the new entrants.</p>
 <div class="meta"><span>Analysis by Keenan Francisco</span><span>Latest full year: FY{data['latest_fy']}</span><span>Source: USAspending.gov</span><span>Pulled: {escape(data['pull_end'][:10])} UTC</span></div></header>
 <main id="analysis"><nav aria-label="Analysis"><a href="#cohort-totals">Obligations</a><a href="#latest-fixed-share">Fixed-price ranking</a><a href="#fixed-share-history">Trends</a><a href="#anduril-pricing-mix">Anduril</a><a href="#method">Method</a></nav>
 <div class="cohorts"><p><strong>New entrants</strong> Anduril · Palantir · Shield AI</p><p><strong>Primes</strong> Lockheed Martin · RTX (Raytheon) · Northrop Grumman · General Dynamics · Boeing</p></div>
 <noscript><p>Enable JavaScript for interactive charts, or use each chart’s data table below.</p></noscript>{''.join(sections)}</main>
 <footer id="method"><h2>Source &amp; method</h2><p>Net obligations on DoD-awarded contracts (award types A–D), grouped by transaction action date and fiscal year. Each of the 16 pricing codes is queried separately, all recipient pages are collected, and case-insensitive full-name regexes plus exact subsidiary lists select named legal entities. Fixed-price share is max(fixed-group net obligations, 0) divided by the sum of positive net obligations across configured pricing groups; a zero denominator is undefined.</p>
-<p>{data['row_count']:,} recipient/code/year rows · {data['query_count']:,} completed queries · pull window {escape(data['pull_start'])} to {escape(data['pull_end'])}.</p>
+<p>{data['row_count']:,} recipient/code/year rows · {data['query_count']:,} completed queries · pulled {escape(data['pull_end'][:10])}.</p>
 <p>{len(data['exclusions'])} company/name pairs were excluded by the matching rules; subsidiaries and joint ventures in this list remain attribution uncertainties.</p>
 <div class="method"><a href="{ENDPOINT}">USAspending API endpoint</a><a href="https://github.com/fedspendingtransparency/usaspending-api/blob/master/usaspending_api/api_contracts/contracts/v2/search/spending_by_category/recipient.md">API documentation</a><a href="recipient_matching.csv" download>All excluded recipient names (CSV)</a></div>
 <p>{escape(export_note)} This page includes its data and styles; the pinned Plotly CDN requires an internet connection.</p><h2>Caveats</h2><ul>{caveats}</ul></footer></body></html>
